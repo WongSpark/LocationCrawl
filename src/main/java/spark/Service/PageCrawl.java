@@ -59,6 +59,7 @@ public class PageCrawl {
             FileOutputStream fileOutputStream = new FileOutputStream(fileCsv,true);
             OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream,"UTF-8");
             bufferCsv = new BufferedWriter(outputStreamWriter);
+            //写入csv文件头，防止出现乱码
             bufferCsv.write(new String(new byte[] { (byte) 0xEF, (byte) 0xBB,(byte) 0xBF }));
 
             docPage = Jsoup.connect(requestUrl).timeout(5000)
