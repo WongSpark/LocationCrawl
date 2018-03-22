@@ -51,19 +51,43 @@ public class PageCrawl {
         }
     }
 
-    public String getOnePageData(String requestUrl) {
-        Document docPage = null;
-        BufferedWriter  bufferCsv = null;
-        try {
-            File fileCsv = FileUtils.CreateIfNotExist(savePath);
-            FileOutputStream fileOutputStream = new FileOutputStream(fileCsv,true);
+    private String getOnePageData(String requestUrl) {
+        try(FileOutputStream fileOutputStream = new FileOutputStream(FileUtils.CreateIfNotExist(savePath),true);
             OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream,"UTF-8");
-            bufferCsv = new BufferedWriter(outputStreamWriter);
-            //写入csv文件头，防止出现乱码
-            bufferCsv.write(new String(new byte[] { (byte) 0xEF, (byte) 0xBB,(byte) 0xBF }));
+            BufferedWriter bufferCsv = new BufferedWriter(outputStreamWriter)) {
 
-            docPage = Jsoup.connect(requestUrl).timeout(5000)
+            bufferCsv.write(new String(new byte[] { (byte) 0xEF, (byte) 0xBB,(byte) 0xBF }));
+            Document docPage = Jsoup.connect(requestUrl).timeout(5000)
                     .userAgent("Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)").get();
+
+            if(docPage!=null) {
+                Elements tablePage = docPage.select("table");
+                Elements trPage = tablePage.select("tr");
+                Elements tdPage;String line="";
+                PoiData poiData = new PoiData();
+                for(int i=0;i<trPage.size();i++){
+                    tdPage = trPage.get(i).select("td");
+                    if(tdPage.size()==4) {
+                        poiData.setId(UUID.randomUUID().toString());
+                        poiData.setName(tdPage.get(0).select("a").text());
+                        poiData.setUrl(tdPage.get(0).select("a").attr("href"));
+                        poiData.setAddress(tdPage.get(1).text());
+                        poiData.setPhone(tdPage.get(2).text());
+                        poiData.setCatogray(tdPage.get(3).text());
+                        line = poiData.getId()+","+poiData.getName()+","+poiData.getUrl()+","+poiData.getAddress()+","+poiData.getPhone()+","+poiData.getCatogray();
+                        bufferCsv.write(line);
+                        bufferCsv.newLine();
+                        bufferCsv.flush();
+                    }
+
+                    if(updateDetailProgress!=null) {
+                        updateDetailProgress.accept(((i+1)*100)/ trPage.size());
+                    }
+                    if(updateConsole!=null){
+                        updateConsole.accept(line);
+                    }
+                }
+            }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
             return "FileNotFoundException";
@@ -73,44 +97,6 @@ public class PageCrawl {
         } catch (IOException e) {
             e.printStackTrace();
             return "IOException";
-        }
-
-        if(docPage!=null) {
-            Elements tablePage = docPage.select("table");
-            Elements trPage = tablePage.select("tr");
-            Elements tdPage;String line="";
-            PoiData poiData = new PoiData();
-            for(int i=0;i<trPage.size();i++){
-                tdPage = trPage.get(i).select("td");
-                if(tdPage.size()==4) {
-                    poiData.setId(UUID.randomUUID().toString());
-                    poiData.setName(tdPage.get(0).select("a").text());
-                    poiData.setUrl(tdPage.get(0).select("a").attr("href"));
-                    poiData.setAddress(tdPage.get(1).text());
-                    poiData.setPhone(tdPage.get(2).text());
-                    poiData.setCatogray(tdPage.get(3).text());
-                    line = poiData.getId()+","+poiData.getName()+","+poiData.getUrl()+","+poiData.getAddress()+","+poiData.getPhone()+","+poiData.getCatogray();
-                    try {
-                        bufferCsv.write(line);
-                        bufferCsv.newLine();
-                        bufferCsv.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                if(updateDetailProgress!=null) {
-                    updateDetailProgress.accept(((i+1)*100)/ trPage.size());
-                }
-                if(updateConsole!=null){
-                    updateConsole.accept(line);
-                }
-            }
-            try {
-                bufferCsv.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
         return "";
     }
